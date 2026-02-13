@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import 'providers/auth_provider.dart';
+import 'providers/biens_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
@@ -24,18 +27,42 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sabad - Gestion immobilière',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
+    // MultiProvider : les écrans utilisent les providers (pas les services directement).
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider<AuthNotifier>(create: (_) => AuthNotifier()),
+        ChangeNotifierProvider<BiensNotifier>(create: (_) => BiensNotifier()),
+      ],
+      child: MaterialApp(
+        title: 'Sabad — Vente & location à Kinshasa',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF0D7377),
+            brightness: Brightness.light,
+            primary: const Color(0xFF0D7377),
+          ),
+          useMaterial3: true,
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            elevation: 0,
+          ),
+          cardTheme: CardThemeData(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            clipBehavior: Clip.antiAlias,
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        // L'écran affiché dépend de l'état d'authentification Firebase.
+        home: const AuthGate(),
+        routes: {
+          '/login': (_) => const LoginScreen(),
+          '/home': (_) => const HomeScreen(),
+        },
       ),
-      // L'écran affiché dépend de l'état d'authentification Firebase.
-      home: const AuthGate(),
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/home': (_) => const HomeScreen(),
-      },
     );
   }
 }

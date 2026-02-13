@@ -43,6 +43,8 @@ dependencies:
   provider: ^6.1.2
   # Connexion Google pour le provider externe
   google_sign_in: ^6.2.3
+  # Base de données Cloud Firestore pour stocker les biens immobiliers, utilisateurs, etc.
+  cloud_firestore: ^5.6.5
 
 dev_dependencies:
   flutter_test:

@@ -1,68 +1,112 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../services/auth_service.dart';
+import '../constants/app_constants.dart';
+import '../providers/auth_provider.dart';
 
-/// Écran de profil affichant les informations de base de l'utilisateur connecté
-/// ainsi qu'un bouton pour se déconnecter.
+/// Profil : email, rôle, bouton déconnexion.
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  /// Déconnecte l'utilisateur via le service d'authentification.
   Future<void> _logout(BuildContext context) async {
-    await AuthService.instance.logout();
-    // Après la déconnexion, l'AuthGate renverra automatiquement l'utilisateur vers l'écran de connexion.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Déconnecté avec succès'),
-      ),
-    );
-    Navigator.of(context).pop();
+    final auth = context.read<AuthNotifier>();
+    try {
+      await auth.logout();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Déconnecté avec succès'), behavior: SnackBarBehavior.floating),
+      );
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(auth.errorMessage ?? 'Erreur'), backgroundColor: Colors.red),
+      );
+      auth.clearError();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = AuthService.instance.currentUser;
+    final auth = context.watch<AuthNotifier>();
+    final user = auth.currentUser;
+    final profile = auth.currentUserProfile;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profil'),
-      ),
+      appBar: AppBar(title: const Text('Mon profil')),
       body: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'Informations du compte',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.email),
-                const SizedBox(width: 8),
-                Text(user?.email ?? 'Email non disponible'),
-              ],
+            Center(
+              child: CircleAvatar(
+                radius: 48,
+                backgroundColor: theme.colorScheme.primaryContainer,
+                child: Icon(Icons.person, size: 48, color: theme.colorScheme.onPrimaryContainer),
+              ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Icon(Icons.person),
-                const SizedBox(width: 8),
-                Text(user?.uid ?? 'Identifiant utilisateur inconnu'),
-              ],
+            const SizedBox(height: 24),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _InfoRow(icon: Icons.email, label: 'Email', value: user?.email ?? '—'),
+                    const Divider(),
+                    _InfoRow(
+                      icon: Icons.badge,
+                      label: 'Rôle',
+                      value: profile != null ? auth.role.label : '—',
+                    ),
+                  ],
+                ),
+              ),
             ),
             const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _logout(context),
-                icon: const Icon(Icons.logout),
-                label: const Text('Se déconnecter'),
+            OutlinedButton.icon(
+              onPressed: () => _logout(context),
+              icon: const Icon(Icons.logout),
+              label: const Text('Se déconnecter'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                foregroundColor: theme.colorScheme.error,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 22, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.labelMedium),
+                Text(value, style: Theme.of(context).textTheme.bodyLarge),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

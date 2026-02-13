@@ -1,12 +1,12 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../services/auth_service.dart';
+import '../providers/auth_provider.dart';
 import 'home_screen.dart';
-import 'profile_screen.dart';
 import 'register_screen.dart';
 
-/// Écran de connexion (email + mot de passe) avec bouton "Se connecter avec Google".
+/// Première page affichée si non connecté : connexion (email/mdp ou Google).
+/// Lien vers inscription ; après inscription l'utilisateur revient ici pour se connecter.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,72 +16,45 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _isLoading = false;
-
-  /// Affiche un message dans une SnackBar en bas de l'écran.
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  /// Connexion classique avec email et mot de passe via Firebase Auth.
-  Future<void> _login() async {
+  Future<void> _login(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
+    final auth = context.read<AuthNotifier>();
     try {
-      await AuthService.instance.loginWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      // Si la connexion réussit, l'AuthGate détectera l'utilisateur connecté.
+      await auth.login(_emailController.text.trim(), _passwordController.text.trim());
+      if (!mounted) return;
       _showSnackBar('Connexion réussie');
-
-      // Optionnel : on peut aussi naviguer explicitement vers la HomeScreen.
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      // Gestion simple des erreurs Firebase (message natif pour l'instant).
-      _showSnackBar(e.message ?? 'Erreur de connexion', isError: true);
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     } catch (_) {
-      _showSnackBar('Erreur inconnue lors de la connexion', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+      _showSnackBar(auth.errorMessage ?? 'Erreur de connexion', isError: true);
+      auth.clearError();
     }
   }
 
-  /// Connexion via le provider externe Google.
-  Future<void> _loginWithGoogle() async {
-    setState(() => _isLoading = true);
-
+  Future<void> _loginWithGoogle(BuildContext context) async {
+    final auth = context.read<AuthNotifier>();
     try {
-      await AuthService.instance.signInWithGoogle();
+      await auth.loginWithGoogle();
+      if (!mounted) return;
       _showSnackBar('Connexion Google réussie');
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      _showSnackBar(e.message ?? 'Erreur de connexion Google', isError: true);
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     } catch (_) {
-      _showSnackBar('Erreur inconnue lors de la connexion Google', isError: true);
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (!mounted) return;
+      _showSnackBar(auth.errorMessage ?? 'Erreur de connexion Google', isError: true);
+      auth.clearError();
     }
   }
 
@@ -94,89 +67,132 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthNotifier>();
+    final isLoading = auth.isLoading;
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Connexion'),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Connectez-vous à votre compte',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez saisir un email';
-                    }
-                    if (!value.contains('@')) {
-                      return 'Veuillez saisir un email valide';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Mot de passe',
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Veuillez saisir un mot de passe';
-                    }
-                    if (value.length < 6) {
-                      return 'Le mot de passe doit contenir au moins 6 caractères';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Se connecter'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _isLoading ? null : _loginWithGoogle,
-                  icon: const Icon(Icons.login),
-                  label: const Text('Se connecter avec Google'),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const RegisterScreen(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              theme.colorScheme.primaryContainer.withOpacity(0.4),
+              theme.colorScheme.surface,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 24),
+                    Icon(Icons.home_work_rounded, size: 72, color: theme.colorScheme.primary),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Sabad',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
                       ),
-                    );
-                  },
-                  child: const Text('Créer un nouveau compte'),
+                      textAlign: TextAlign.center,
+                    ),
+                    Text(
+                      'Vente & location immobilière à Kinshasa',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 32),
+                    Text(
+                      'Connexion',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: InputDecoration(
+                        labelText: 'Email',
+                        hintText: 'exemple@email.com',
+                        prefixIcon: const Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Veuillez saisir un email';
+                        if (!v.contains('@')) return 'Email invalide';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        labelText: 'Mot de passe',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                      ),
+                      obscureText: true,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Veuillez saisir un mot de passe';
+                        if (v.length < 6) return 'Au moins 6 caractères';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: isLoading ? null : () => _login(context),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: isLoading
+                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Se connecter'),
+                    ),
+                    const SizedBox(height: 14),
+                    OutlinedButton.icon(
+                      onPressed: isLoading ? null : () => _loginWithGoogle(context),
+                      icon: const Icon(Icons.login),
+                      label: const Text('Se connecter avec Google'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      'Pas encore de compte ?',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.tonal(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                        );
+                      },
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Créer un compte'),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -184,4 +200,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
