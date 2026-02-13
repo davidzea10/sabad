@@ -57,9 +57,9 @@ class BiensNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Ajoute un nouveau bien. Délègue au service.
-  Future<void> addBien(BienImmobilier bien) async {
-    await _biensService.addBien(bien);
+  /// Ajoute un nouveau bien. Retourne l'id du document créé.
+  Future<String> addBien(BienImmobilier bien) async {
+    return _biensService.addBien(bien);
   }
 
   /// Met à jour un bien existant. Délègue au service.

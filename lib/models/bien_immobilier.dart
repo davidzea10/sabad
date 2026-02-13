@@ -27,8 +27,11 @@ class BienImmobilier {
   /// Adresse complète (optionnelle).
   final String? adresse;
 
-  /// Liste d'URLs vers des images du bien.
+  /// Liste d'URLs des images du bien (1 à 4).
   final List<String> images;
+
+  /// URL de la vidéo du bien (0 ou 1).
+  final String? videoUrl;
 
   /// Identifiant de l'utilisateur propriétaire/créateur du bien (uid Firebase Auth).
   final String proprietaireId;
@@ -55,6 +58,7 @@ class BienImmobilier {
     required this.proprietaireId,
     required this.dateCreation,
     this.adresse,
+    this.videoUrl,
     this.dateModification,
     this.favorisUserIds = const [],
   });
@@ -75,6 +79,7 @@ class BienImmobilier {
       images: (data['images'] as List<dynamic>? ?? [])
           .map((e) => e.toString())
           .toList(),
+      videoUrl: data['videoUrl'] as String?,
       proprietaireId: data['proprietaireId'] as String? ?? '',
       dateCreation: (data['dateCreation'] as Timestamp?)?.toDate() ?? DateTime.now(),
       dateModification: (data['dateModification'] as Timestamp?)?.toDate(),
@@ -95,6 +100,7 @@ class BienImmobilier {
       'typeOffre': typeOffre,
       'adresse': adresse,
       'images': images,
+      if (videoUrl != null) 'videoUrl': videoUrl,
       'proprietaireId': proprietaireId,
       'dateCreation': Timestamp.fromDate(dateCreation),
       if (dateModification != null)
@@ -114,6 +120,7 @@ class BienImmobilier {
     String? typeOffre,
     String? adresse,
     List<String>? images,
+    String? videoUrl,
     String? proprietaireId,
     DateTime? dateCreation,
     DateTime? dateModification,
@@ -129,6 +136,7 @@ class BienImmobilier {
       typeOffre: typeOffre ?? this.typeOffre,
       adresse: adresse ?? this.adresse,
       images: images ?? this.images,
+      videoUrl: videoUrl ?? this.videoUrl,
       proprietaireId: proprietaireId ?? this.proprietaireId,
       dateCreation: dateCreation ?? this.dateCreation,
       dateModification: dateModification ?? this.dateModification,

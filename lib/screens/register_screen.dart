@@ -1,12 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 
-/// Écran d'inscription : email, mot de passe, choix du rôle (Client / Propriétaire).
-/// Après succès → retour à la page Connexion (l'utilisateur doit se connecter).
+/// Inscription : email, mot de passe, nom, téléphone, photo de profil, rôle.
+/// Après succès → déconnexion et retour à la page Connexion.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -17,9 +20,12 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _nomController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   UserRole _selectedRole = UserRole.client;
+  File? _photoFile;
 
   void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -31,6 +37,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  Future<void> _pickPhoto() async {
+    final picker = ImagePicker();
+    final x = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, imageQuality: 85);
+    if (x != null && mounted) setState(() => _photoFile = File(x.path));
+  }
+
   Future<void> _register(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -40,6 +52,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
         _selectedRole,
+        displayName: _nomController.text.trim().isEmpty ? null : _nomController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        photoFile: _photoFile,
       );
       if (!mounted) return;
       await auth.logout();
@@ -59,6 +74,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _emailController.dispose();
+    _nomController.dispose();
+    _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -92,28 +109,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const SizedBox(height: 16),
+                    Center(
+                      child: GestureDetector(
+                        onTap: _pickPhoto,
+                        child: CircleAvatar(
+                          radius: 48,
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          backgroundImage: _photoFile != null ? FileImage(_photoFile!) : null,
+                          child: _photoFile == null
+                              ? Icon(Icons.add_a_photo, size: 40, color: theme.colorScheme.primary)
+                              : null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Photo de profil (optionnel)',
+                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 20),
-                    Icon(Icons.home_work_rounded, size: 56, color: theme.colorScheme.primary),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Créer un compte',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    TextFormField(
+                      controller: _nomController,
+                      decoration: InputDecoration(
+                        labelText: 'Nom complet',
+                        hintText: 'Votre nom',
+                        prefixIcon: const Icon(Icons.person_outline),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
                       ),
-                      textAlign: TextAlign.center,
+                      textCapitalization: TextCapitalization.words,
                     ),
-                    Text(
-                      'Sabad — Vente & location à Kinshasa',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: _emailController,
                       decoration: InputDecoration(
-                        labelText: 'Email',
+                        labelText: 'Email *',
                         hintText: 'exemple@email.com',
                         prefixIcon: const Icon(Icons.email_outlined),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -128,9 +160,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
+                      controller: _phoneController,
+                      decoration: InputDecoration(
+                        labelText: 'Téléphone (WhatsApp)',
+                        hintText: '+243 XXX XXX XXX',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        filled: true,
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
                       controller: _passwordController,
                       decoration: InputDecoration(
-                        labelText: 'Mot de passe',
+                        labelText: 'Mot de passe *',
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         filled: true,
@@ -146,7 +190,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     TextFormField(
                       controller: _confirmPasswordController,
                       decoration: InputDecoration(
-                        labelText: 'Confirmer le mot de passe',
+                        labelText: 'Confirmer le mot de passe *',
                         prefixIcon: const Icon(Icons.lock_outline),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         filled: true,
@@ -161,9 +205,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 20),
                     Text(
                       'Je suis',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 8),
                     SegmentedButton<UserRole>(
@@ -172,9 +214,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ButtonSegment(value: UserRole.proprietaire, label: Text('Propriétaire'), icon: Icon(Icons.home_work)),
                       ],
                       selected: {_selectedRole},
-                      onSelectionChanged: (Set<UserRole> selected) {
-                        setState(() => _selectedRole = selected.first);
-                      },
+                      onSelectionChanged: (Set<UserRole> selected) => setState(() => _selectedRole = selected.first),
                     ),
                     const SizedBox(height: 28),
                     FilledButton(

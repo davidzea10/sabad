@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
-import 'home_screen.dart';
+import 'main_shell_screen.dart';
 import 'register_screen.dart';
 
 /// Première page affichée si non connecté : connexion (email/mdp ou Google).
@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await auth.login(_emailController.text.trim(), _passwordController.text.trim());
       if (!mounted) return;
       _showSnackBar('Connexion réussie');
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainShellScreen()));
     } catch (_) {
       if (!mounted) return;
       _showSnackBar(auth.errorMessage ?? 'Erreur de connexion', isError: true);
@@ -50,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await auth.loginWithGoogle();
       if (!mounted) return;
       _showSnackBar('Connexion Google réussie');
-      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const MainShellScreen()));
     } catch (_) {
       if (!mounted) return;
       _showSnackBar(auth.errorMessage ?? 'Erreur de connexion Google', isError: true);

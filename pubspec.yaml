@@ -45,6 +45,12 @@ dependencies:
   google_sign_in: ^6.2.3
   # Base de données Cloud Firestore pour stocker les biens immobiliers, utilisateurs, etc.
   cloud_firestore: ^5.6.5
+  # Stockage des images et vidéos (profil, biens)
+  firebase_storage: ^12.3.4
+  # Sélection d'images et vidéos depuis la galerie / caméra
+  image_picker: ^1.0.7
+  # Ouvrir WhatsApp avec un numéro
+  url_launcher: ^6.2.5
 
 dev_dependencies:
   flutter_test:

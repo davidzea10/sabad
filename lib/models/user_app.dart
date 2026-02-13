@@ -9,8 +9,11 @@ class UserApp {
   /// Adresse email de l'utilisateur.
   final String email;
 
-  /// Nom à afficher (peut provenir de Google ou être saisi manuellement).
+  /// Nom à afficher (saisi à l'inscription ou Google).
   final String? displayName;
+
+  /// Numéro de téléphone (contact, WhatsApp).
+  final String? phone;
 
   /// URL de la photo de profil (optionnelle).
   final String? photoUrl;
@@ -27,6 +30,7 @@ class UserApp {
     required this.dateInscription,
     required this.role,
     this.displayName,
+    this.phone,
     this.photoUrl,
   });
 
@@ -37,6 +41,7 @@ class UserApp {
       uid: doc.id,
       email: data['email'] as String? ?? '',
       displayName: data['displayName'] as String?,
+      phone: data['phone'] as String?,
       photoUrl: data['photoUrl'] as String?,
       dateInscription:
           (data['dateInscription'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -49,6 +54,7 @@ class UserApp {
     return {
       'email': email,
       'displayName': displayName,
+      'phone': phone,
       'photoUrl': photoUrl,
       'dateInscription': Timestamp.fromDate(dateInscription),
       'role': role,

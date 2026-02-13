@@ -1,14 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/app_constants.dart';
 import '../models/bien_immobilier.dart';
 import '../providers/auth_provider.dart';
 import '../providers/biens_provider.dart';
+import '../services/conversations_service.dart';
+import '../services/users_service.dart';
+import 'chat_screen.dart';
 import 'form_bien_screen.dart';
-import 'home_screen.dart';
+import 'main_shell_screen.dart';
 
-/// Écran de détail : client = favori + Contacter ; propriétaire (son bien) = Modifier + Supprimer.
+Future<void> _openWhatsApp(BuildContext context, String phone) async {
+  final p = phone.replaceAll(RegExp(r'[^\d]'), '');
+  final uri = Uri.parse('https://wa.me/$p');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  } else if (context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Impossible d\'ouvrir WhatsApp')),
+    );
+  }
+}
+
+/// Écran de détail : client = favori + Contacter (WhatsApp) ; propriétaire = Modifier + Supprimer.
 class DetailBienScreen extends StatelessWidget {
   const DetailBienScreen({super.key, required this.bien});
 
@@ -51,15 +67,7 @@ class DetailBienScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              height: 180,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(Icons.home_rounded, size: 72, color: theme.colorScheme.primary),
-            ),
+            _BienMediaSection(bien: bien),
             const SizedBox(height: 20),
             Text(
               bien.titre,
@@ -118,18 +126,50 @@ class DetailBienScreen extends StatelessWidget {
                 ],
               ),
             ] else ...[
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Contacter le propriétaire (à configurer)'), behavior: SnackBarBehavior.floating),
-                    );
-                  },
-                  icon: const Icon(Icons.phone),
-                  label: const Text('Contacter le propriétaire'),
-                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                ),
+              FutureBuilder(
+                future: UsersService.instance.getUser(bien.proprietaireId),
+                builder: (context, snapshot) {
+                  final ownerPhone = snapshot.data?.phone;
+                  final myUid = auth.currentUser?.uid ?? '';
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () async {
+                          if (myUid.isEmpty) return;
+                          final convId = await ConversationsService.instance.createOrGetConversation(
+                            uid1: myUid,
+                            uid2: bien.proprietaireId,
+                            bienId: bien.id,
+                            bienTitre: bien.titre,
+                          );
+                          if (!context.mounted) return;
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ChatScreen(
+                                conversationId: convId,
+                                otherParticipantId: bien.proprietaireId,
+                                bienTitre: bien.titre,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.message),
+                        label: const Text('Envoyer un message'),
+                        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      ),
+                      if (ownerPhone != null && ownerPhone.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () => _openWhatsApp(context, ownerPhone),
+                          icon: const Icon(Icons.chat),
+                          label: const Text('Contacter par WhatsApp'),
+                          style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ],
           ],
@@ -173,7 +213,7 @@ class DetailBienScreen extends StatelessWidget {
         const SnackBar(content: Text('Bien supprimé')),
       );
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const MainShellScreen()),
         (route) => false,
       );
     } catch (e) {
@@ -182,6 +222,91 @@ class DetailBienScreen extends StatelessWidget {
         SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+}
+
+class _BienMediaSection extends StatelessWidget {
+  const _BienMediaSection({required this.bien});
+
+  final BienImmobilier bien;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasImages = bien.images.isNotEmpty;
+    final hasVideo = bien.videoUrl != null && bien.videoUrl!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasImages) ...[
+          SizedBox(
+            height: 220,
+            child: PageView.builder(
+              itemCount: bien.images.length,
+              itemBuilder: (context, index) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      bien.images[index],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: Icon(Icons.broken_image, size: 48, color: theme.colorScheme.primary),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (bien.images.length > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  bien.images.length,
+                  (i) => Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: theme.colorScheme.primary.withOpacity(0.6),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ] else
+          Container(
+            width: double.infinity,
+            height: 180,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(Icons.home_rounded, size: 72, color: theme.colorScheme.primary),
+          ),
+        if (hasVideo) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final uri = Uri.parse(bien.videoUrl!);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            icon: const Icon(Icons.videocam),
+            label: const Text('Voir la vidéo'),
+          ),
+        ],
+      ],
+    );
   }
 }
 

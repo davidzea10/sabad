@@ -4,9 +4,12 @@ import 'package:provider/provider.dart';
 import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 
-/// Profil : email, rôle, bouton déconnexion.
+/// Profil : email, rôle, téléphone, photo, bouton déconnexion.
 class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.showAppBar = true});
+
+  /// Si false, pas d'AppBar (utilisé dans l'onglet Profil du shell).
+  final bool showAppBar;
 
   Future<void> _logout(BuildContext context) async {
     final auth = context.read<AuthNotifier>();
@@ -34,7 +37,7 @@ class ProfileScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Mon profil')),
+      appBar: showAppBar ? AppBar(title: const Text('Mon profil')) : null,
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -45,7 +48,12 @@ class ProfileScreen extends StatelessWidget {
               child: CircleAvatar(
                 radius: 48,
                 backgroundColor: theme.colorScheme.primaryContainer,
-                child: Icon(Icons.person, size: 48, color: theme.colorScheme.onPrimaryContainer),
+                backgroundImage: profile?.photoUrl != null && profile!.photoUrl!.isNotEmpty
+                    ? NetworkImage(profile.photoUrl!)
+                    : null,
+                child: profile?.photoUrl == null || profile!.photoUrl!.isEmpty
+                    ? Icon(Icons.person, size: 48, color: theme.colorScheme.onPrimaryContainer)
+                    : null,
               ),
             ),
             const SizedBox(height: 24),
@@ -56,6 +64,10 @@ class ProfileScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _InfoRow(icon: Icons.email, label: 'Email', value: user?.email ?? '—'),
+                    if (profile?.phone != null && profile!.phone!.isNotEmpty) ...[
+                      const Divider(),
+                      _InfoRow(icon: Icons.phone, label: 'Téléphone', value: profile.phone!),
+                    ],
                     const Divider(),
                     _InfoRow(
                       icon: Icons.badge,

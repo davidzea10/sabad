@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import '../models/user_app.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
 import '../services/users_service.dart';
 
 /// Gestionnaire d'état d'authentification (ChangeNotifier) : utilisateur courant,
@@ -80,8 +82,15 @@ class AuthNotifier extends ChangeNotifier {
     _setError(null);
   }
 
-  /// Inscription avec email, mot de passe et rôle. Crée le profil dans Firestore.
-  Future<void> register(String email, String password, UserRole role) async {
+  /// Inscription avec email, mot de passe, rôle, nom, téléphone et optionnellement photo.
+  Future<void> register(
+    String email,
+    String password,
+    UserRole role, {
+    String? displayName,
+    String? phone,
+    File? photoFile,
+  }) async {
     _setLoading(true);
     _setError(null);
     try {
@@ -91,13 +100,18 @@ class AuthNotifier extends ChangeNotifier {
       );
       final user = _authService.currentUser;
       if (user != null) {
+        String? photoUrl = user.photoURL;
+        if (photoFile != null) {
+          photoUrl = await StorageService.instance.uploadProfilePhoto(user.uid, photoFile);
+        }
         final profile = UserApp(
           uid: user.uid,
           email: user.email ?? email,
           dateInscription: DateTime.now(),
           role: role.value,
-          displayName: user.displayName,
-          photoUrl: user.photoURL,
+          displayName: displayName ?? user.displayName,
+          phone: phone,
+          photoUrl: photoUrl,
         );
         await _usersService.createOrUpdateUser(profile);
       }

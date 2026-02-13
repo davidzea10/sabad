@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/biens_provider.dart';
-import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/main_shell_screen.dart';
 
 /// Point d'entrée principal de l'application.
 /// On initialise d'abord Firebase avant de lancer l'application Flutter.
@@ -60,7 +60,7 @@ class MyApp extends StatelessWidget {
         home: const AuthGate(),
         routes: {
           '/login': (_) => const LoginScreen(),
-          '/home': (_) => const HomeScreen(),
+          '/home': (_) => const MainShellScreen(),
         },
       ),
     );
@@ -89,9 +89,9 @@ class AuthGate extends StatelessWidget {
           );
         }
 
-        // Si un utilisateur est connecté, on affiche l'écran d'accueil.
+        // Si un utilisateur est connecté, on affiche le shell avec la barre de navigation.
         if (snapshot.hasData) {
-          return const HomeScreen();
+          return const MainShellScreen();
         }
 
         // Sinon, on affiche l'écran de connexion.

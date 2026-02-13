@@ -14,9 +14,10 @@ class BiensService {
   final CollectionReference<Map<String, dynamic>> _collection =
       FirebaseFirestore.instance.collection('biens');
 
-  /// Ajoute un nouveau bien immobilier dans Firestore.
-  Future<void> addBien(BienImmobilier bien) async {
-    await _collection.add(bien.toMap());
+  /// Ajoute un nouveau bien immobilier dans Firestore. Retourne l'id du document créé.
+  Future<String> addBien(BienImmobilier bien) async {
+    final ref = await _collection.add(bien.toMap());
+    return ref.id;
   }
 
   /// Met à jour un bien existant (en se basant sur son `id`).
