@@ -8,15 +8,13 @@ import '../constants/app_constants.dart';
 import '../models/bien_immobilier.dart';
 import '../providers/auth_provider.dart';
 import '../providers/biens_provider.dart';
+import '../services/payment_service.dart';
 import '../services/storage_service.dart';
 import 'main_shell_screen.dart';
 
-/// Écran formulaire pour ajouter ou modifier un bien immobilier.
-/// [bien] null = ajout, non null = modification.
+/// Formulaire complet d'ajout/modification avec photos, vidéo et garanties.
 class FormBienScreen extends StatefulWidget {
   const FormBienScreen({super.key, this.bien});
-
-  /// Null pour créer un nouveau bien, non null pour éditer.
   final BienImmobilier? bien;
 
   @override
@@ -30,23 +28,25 @@ class _FormBienScreenState extends State<FormBienScreen> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _prixController;
   late final TextEditingController _adresseController;
+
   String _selectedCommune = kCommunesKinshasa.first;
   String _selectedTypeOffre = kTypeLouer;
 
-  /// Images existantes (URLs) en mode édition.
+  // Gestion des images de la maison (Max 4)
   final List<String> _existingImageUrls = [];
-  /// Nouvelles images sélectionnées (1 à 4 au total avec _existingImageUrls).
   final List<File> _imageFiles = [];
-  /// URL de la vidéo existante en mode édition.
-  String? _existingVideoUrl;
-  /// Nouvelle vidéo sélectionnée (0 ou 1).
+
+  // Gestion de la vidéo
   File? _videoFile;
+  String? _existingVideoUrl;
+
+  // Gestion des garanties
+  File? _identityFile;
+  File? _parcelFile;
+  String? _existingIdentityUrl;
+  String? _existingParcelUrl;
 
   bool _isSaving = false;
-
-  bool get isEditMode => widget.bien != null;
-  int get _totalImageCount => _existingImageUrls.length + _imageFiles.length;
-  bool get _hasVideo => _existingVideoUrl != null || _videoFile != null;
 
   @override
   void initState() {
@@ -58,198 +58,169 @@ class _FormBienScreenState extends State<FormBienScreen> {
       text: b != null ? b.prix.toStringAsFixed(0) : '',
     );
     _adresseController = TextEditingController(text: b?.adresse ?? '');
+
     if (b != null) {
-      _selectedCommune = b.commune.isNotEmpty ? b.commune : kCommunesKinshasa.first;
+      _selectedCommune = b.commune.isNotEmpty
+          ? b.commune
+          : kCommunesKinshasa.first;
       _selectedTypeOffre = b.typeOffre;
       _existingImageUrls.addAll(b.images);
       _existingVideoUrl = b.videoUrl;
+      _existingIdentityUrl = b.identityDocUrl;
+      _existingParcelUrl = b.parcelDocUrl;
     }
   }
 
-  @override
-  void dispose() {
-    _titreController.dispose();
-    _descriptionController.dispose();
-    _prixController.dispose();
-    _adresseController.dispose();
-    super.dispose();
-  }
-
+  // Sélection de fichiers (Images, Vidéo, Garanties)
   Future<void> _pickImages() async {
-    if (_totalImageCount >= 4) return;
-    final list = await _imagePicker.pickMultiImage();
-    if (list.isEmpty) return;
-    final remaining = 4 - _totalImageCount;
-    final toAdd = list.take(remaining).map((x) => File(x.path)).toList();
-    setState(() => _imageFiles.addAll(toAdd));
+    final list = await _imagePicker.pickMultiImage(imageQuality: 80);
+    if (list.isNotEmpty) {
+      setState(() {
+        _imageFiles.addAll(
+          list
+              .take(4 - (_existingImageUrls.length + _imageFiles.length))
+              .map((x) => File(x.path)),
+        );
+      });
+    }
   }
 
   Future<void> _pickVideo() async {
-    if (_hasVideo) return;
     final x = await _imagePicker.pickVideo(source: ImageSource.gallery);
-    if (x == null) return;
-    setState(() => _videoFile = File(x.path));
+    if (x != null) setState(() => _videoFile = File(x.path));
   }
 
-  void _removeImageFile(int index) {
-    setState(() => _imageFiles.removeAt(index));
-  }
-
-  void _removeExistingImage(int index) {
-    setState(() => _existingImageUrls.removeAt(index));
-  }
-
-  void _removeVideo() {
-    setState(() {
-      _videoFile = null;
-      _existingVideoUrl = null;
-    });
-  }
-
-  Widget _buildImageChip({String? url, File? file, required VoidCallback onRemove}) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            width: 80,
-            height: 80,
-            child: url != null
-                ? Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image))
-                : Image.file(file!, fit: BoxFit.cover),
-          ),
-        ),
-        Positioned(
-          top: -6,
-          right: -6,
-          child: IconButton(
-            icon: const Icon(Icons.close, size: 20),
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.black54,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.all(4),
-              minimumSize: const Size(28, 28),
-            ),
-            onPressed: onRemove,
-          ),
-        ),
-      ],
+  Future<void> _pickGarantie(bool isIdentity) async {
+    final x = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
     );
+    if (x != null) {
+      setState(() {
+        if (isIdentity)
+          _identityFile = File(x.path);
+        else
+          _parcelFile = File(x.path);
+      });
+    }
   }
 
   Future<void> _save(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_totalImageCount > 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maximum 4 images.'), backgroundColor: Colors.red),
-      );
+    // Vérification Garanties
+    if (_identityFile == null && _existingIdentityUrl == null) {
+      _showError('La pièce d\'identité est obligatoire.');
+      return;
+    }
+    if (_selectedTypeOffre == kTypeVendre &&
+        _parcelFile == null &&
+        _existingParcelUrl == null) {
+      _showError('Les papiers de la parcelle sont obligatoires pour la vente.');
       return;
     }
 
     final auth = context.read<AuthNotifier>();
     final biensNotifier = context.read<BiensNotifier>();
-    final userId = auth.currentUser?.uid;
-    if (userId == null || userId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vous devez être connecté.'), backgroundColor: Colors.red),
-      );
-      return;
-    }
+    final userId = auth.currentUser?.uid ?? '';
 
     setState(() => _isSaving = true);
 
     try {
-      final prix = double.tryParse(_prixController.text.trim()) ?? 0.0;
-      final storage = StorageService.instance;
-
-      if (isEditMode) {
-        final bienId = widget.bien!.id;
-        final List<String> imageUrls = List.from(_existingImageUrls);
-        for (var i = 0; i < _imageFiles.length; i++) {
-          final url = await storage.uploadBienImage(bienId, _imageFiles[i], imageUrls.length + i);
-          imageUrls.add(url);
+      // 1. Vérification Paiement (si nouveau poste et pas le premier)
+      final count = await biensNotifier.countUserBiens(userId);
+      if (count >= 1 && widget.bien == null) {
+        final paid = await PaymentService.instance.processLabyrinthePayment(
+          context: context,
+          amount: 5.0,
+          reason: 'Publication immobilière',
+        );
+        if (!paid) {
+          setState(() => _isSaving = false);
+          return;
         }
-        String? videoUrl = _existingVideoUrl;
-        if (_videoFile != null) {
-          videoUrl = await storage.uploadBienVideo(bienId, _videoFile!);
-        }
-        final bien = widget.bien!.copyWith(
-          titre: _titreController.text.trim(),
-          description: _descriptionController.text.trim(),
-          prix: prix,
-          commune: _selectedCommune,
-          typeOffre: _selectedTypeOffre,
-          adresse: _adresseController.text.trim().isEmpty ? null : _adresseController.text.trim(),
-          images: imageUrls,
-          videoUrl: videoUrl,
-          dateModification: DateTime.now(),
-        );
-        await biensNotifier.updateBien(bien);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bien modifié')),
-        );
-      } else {
-        final bien = BienImmobilier(
-          id: '',
-          titre: _titreController.text.trim(),
-          description: _descriptionController.text.trim(),
-          prix: prix,
-          ville: kVilleKinshasa,
-          commune: _selectedCommune,
-          typeOffre: _selectedTypeOffre,
-          adresse: _adresseController.text.trim().isEmpty ? null : _adresseController.text.trim(),
-          images: [],
-          proprietaireId: userId,
-          dateCreation: DateTime.now(),
-        );
-        final bienId = await biensNotifier.addBien(bien);
-        final List<String> imageUrls = [];
-        for (var i = 0; i < _imageFiles.length; i++) {
-          final url = await storage.uploadBienImage(bienId, _imageFiles[i], i);
-          imageUrls.add(url);
-        }
-        String? videoUrl;
-        if (_videoFile != null) {
-          videoUrl = await storage.uploadBienVideo(bienId, _videoFile!);
-        }
-        final bienUpdated = bien.copyWith(
-          id: bienId,
-          images: imageUrls,
-          videoUrl: videoUrl,
-        );
-        await biensNotifier.updateBien(bienUpdated);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bien ajouté')),
-        );
       }
 
-      if (!context.mounted) return;
+      final storage = StorageService.instance;
+      final tempId =
+          widget.bien?.id ?? DateTime.now().millisecondsSinceEpoch.toString();
+
+      // 2. Upload des garanties
+      String identityUrl = _existingIdentityUrl ?? '';
+      if (_identityFile != null) {
+        identityUrl = await storage.uploadBienImage(tempId, _identityFile!, 99);
+      }
+      String? parcelUrl = _existingParcelUrl;
+      if (_parcelFile != null) {
+        parcelUrl = await storage.uploadBienImage(tempId, _parcelFile!, 100);
+      }
+
+      // 3. Upload des images de la maison
+      List<String> finalImageUrls = List.from(_existingImageUrls);
+      for (var i = 0; i < _imageFiles.length; i++) {
+        final url = await storage.uploadBienImage(
+          tempId,
+          _imageFiles[i],
+          finalImageUrls.length + i,
+        );
+        finalImageUrls.add(url);
+      }
+
+      // 4. Upload de la vidéo
+      String? finalVideoUrl = _existingVideoUrl;
+      if (_videoFile != null) {
+        finalVideoUrl = await storage.uploadBienVideo(tempId, _videoFile!);
+      }
+
+      final bien = BienImmobilier(
+        id: widget.bien?.id ?? '',
+        titre: _titreController.text.trim(),
+        description: _descriptionController.text.trim(),
+        prix: double.tryParse(_prixController.text) ?? 0,
+        ville: 'Kinshasa',
+        commune: _selectedCommune,
+        typeOffre: _selectedTypeOffre,
+        images: finalImageUrls,
+        videoUrl: finalVideoUrl,
+        proprietaireId: userId,
+        dateCreation: widget.bien?.dateCreation ?? DateTime.now(),
+        identityDocUrl: identityUrl,
+        parcelDocUrl: parcelUrl,
+        adresse: _adresseController.text.trim(),
+      );
+
+      if (widget.bien == null)
+        await biensNotifier.addBien(bien);
+      else
+        await biensNotifier.updateBien(bien);
+
+      if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const MainShellScreen()),
         (route) => false,
       );
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
-      );
+      _showError('Erreur lors de la sauvegarde: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
+  void _showError(String msg) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditMode ? 'Modifier le bien' : 'Nouveau bien'),
+        title: Text(widget.bien == null ? 'Nouvelle annonce' : 'Modifier'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
@@ -258,132 +229,233 @@ class _FormBienScreenState extends State<FormBienScreen> {
               TextFormField(
                 controller: _titreController,
                 decoration: const InputDecoration(
-                  labelText: 'Titre *',
-                  border: OutlineInputBorder(),
+                  labelText: 'Titre de l\'annonce',
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Requis';
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Description *',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
+                  labelText: 'Description détaillée',
                 ),
-                maxLines: 4,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Requis';
-                  return null;
-                },
+                maxLines: 3,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _prixController,
-                decoration: const InputDecoration(
-                  labelText: 'Prix (\$) *',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'Prix (\$)'),
                 keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Requis';
-                  if (double.tryParse(v.trim()) == null) return 'Nombre invalide';
-                  return null;
-                },
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _selectedCommune,
-                decoration: InputDecoration(
-                  labelText: 'Commune (Kinshasa) *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                ),
-                items: kCommunesKinshasa.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                onChanged: (v) => setState(() => _selectedCommune = v ?? kCommunesKinshasa.first),
+                items: kCommunesKinshasa
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedCommune = v!),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _selectedTypeOffre,
-                decoration: InputDecoration(
-                  labelText: 'Offre *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  filled: true,
-                ),
-                items: kTypesOffre.map((e) => DropdownMenuItem(value: e['value'], child: Text(e['label']!))).toList(),
-                onChanged: (v) => setState(() => _selectedTypeOffre = v ?? kTypeLouer),
+                items: const [
+                  DropdownMenuItem(value: kTypeLouer, child: Text('À louer')),
+                  DropdownMenuItem(value: kTypeVendre, child: Text('À vendre')),
+                ],
+                onChanged: (v) => setState(() => _selectedTypeOffre = v!),
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _adresseController,
-                decoration: const InputDecoration(
-                  labelText: 'Adresse (optionnel)',
-                  border: OutlineInputBorder(),
+
+              const SizedBox(height: 24),
+              Text(
+                'PHOTOS ET VIDÉO',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
                 ),
               ),
-              const SizedBox(height: 20),
-              Text('Images (optionnel, 0 à 4)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  ...List.generate(_existingImageUrls.length, (i) => _buildImageChip(url: _existingImageUrls[i], onRemove: () => _removeExistingImage(i))),
-                  ...List.generate(_imageFiles.length, (i) => _buildImageChip(file: _imageFiles[i], onRemove: () => _removeImageFile(i))),
-                  if (_totalImageCount < 4)
-                    GestureDetector(
+                  ..._existingImageUrls.map((url) => _Thumbnail(url: url)),
+                  ..._imageFiles.map((file) => _Thumbnail(file: file)),
+                  if ((_existingImageUrls.length + _imageFiles.length) < 4)
+                    _AddMediaButton(
+                      icon: Icons.add_a_photo,
+                      label: 'Photo',
                       onTap: _pickImages,
-                      child: Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Theme.of(context).colorScheme.outline),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.add_photo_alternate, color: Theme.of(context).colorScheme.primary),
-                      ),
+                    ),
+                  if (_videoFile == null && _existingVideoUrl == null)
+                    _AddMediaButton(
+                      icon: Icons.videocam,
+                      label: 'Vidéo',
+                      onTap: _pickVideo,
+                    )
+                  else
+                    const _MediaBadge(
+                      icon: Icons.check_circle,
+                      label: 'Vidéo ajoutée',
+                      color: Colors.green,
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text('Vidéo (optionnel, 1 max)', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              if (_hasVideo)
-                Row(
-                  children: [
-                    Icon(Icons.videocam, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text(_videoFile != null ? 'Vidéo sélectionnée' : 'Vidéo enregistrée', style: Theme.of(context).textTheme.bodyMedium),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: _removeVideo,
-                      child: const Text('Retirer'),
-                    ),
-                  ],
-                )
-              else
-                OutlinedButton.icon(
-                  onPressed: _pickVideo,
-                  icon: const Icon(Icons.video_library),
-                  label: const Text('Ajouter une vidéo'),
+
+              const SizedBox(height: 32),
+              Text(
+                'GARANTIES SÉCURITÉ',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
                 ),
-              const SizedBox(height: 24),
+              ),
+              const SizedBox(height: 12),
+              _GarantieTile(
+                icon: Icons.badge,
+                label: 'Pièce d\'identité (Recto/Verso)',
+                isAdded: _identityFile != null || _existingIdentityUrl != null,
+                onTap: () => _pickGarantie(true),
+              ),
+              if (_selectedTypeOffre == kTypeVendre)
+                _GarantieTile(
+                  icon: Icons.description,
+                  label: 'Papiers de la parcelle',
+                  isAdded: _parcelFile != null || _existingParcelUrl != null,
+                  onTap: () => _pickGarantie(false),
+                ),
+
+              const SizedBox(height: 40),
               ElevatedButton(
                 onPressed: _isSaving ? null : () => _save(context),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 child: _isSaving
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(isEditMode ? 'Enregistrer' : 'Ajouter'),
+                    ? const CircularProgressIndicator()
+                    : const Text('Publier l\'annonce'),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({this.url, this.file});
+  final String? url;
+  final File? file;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 70,
+        height: 70,
+        child: url != null
+            ? Image.network(url!, fit: BoxFit.cover)
+            : Image.file(file!, fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+class _AddMediaButton extends StatelessWidget {
+  const _AddMediaButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: 70,
+        height: 70,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 24),
+            Text(label, style: const TextStyle(fontSize: 10)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaBadge extends StatelessWidget {
+  const _MediaBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GarantieTile extends StatelessWidget {
+  const _GarantieTile({
+    required this.icon,
+    required this.label,
+    required this.isAdded,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final bool isAdded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: CircleAvatar(
+        backgroundColor: isAdded ? Colors.green.shade100 : Colors.grey.shade100,
+        child: Icon(icon, color: isAdded ? Colors.green : Colors.grey),
+      ),
+      title: Text(label, style: const TextStyle(fontSize: 14)),
+      trailing: TextButton(
+        onPressed: onTap,
+        child: Text(isAdded ? 'Modifier' : 'Ajouter'),
       ),
     );
   }

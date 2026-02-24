@@ -82,7 +82,8 @@ class BienImmobilier {
       if (videoUrl != null) 'videoUrl': videoUrl,
       'proprietaireId': proprietaireId,
       'dateCreation': Timestamp.fromDate(dateCreation),
-      if (dateModification != null) Timestamp.fromDate(dateModification!),
+      if (dateModification != null)
+        'dateModification': Timestamp.fromDate(dateModification!),
       'favorisUserIds': favorisUserIds,
       'identityDocUrl': identityDocUrl,
       if (parcelDocUrl != null) 'parcelDocUrl': parcelDocUrl,

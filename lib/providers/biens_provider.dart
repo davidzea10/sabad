@@ -22,7 +22,6 @@ class BiensNotifier extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   /// Démarre l'écoute en temps réel de la collection Firestore `biens`.
-  /// À appeler par exemple depuis l'écran d'accueil ou la liste des biens.
   void startListening() {
     _isLoading = true;
     notifyListeners();
@@ -45,10 +44,15 @@ class BiensNotifier extends ChangeNotifier {
     );
   }
 
-  /// Arrête l'écoute (à appeler dans dispose du widget qui utilise le provider).
+  /// Arrête l'écoute.
   void stopListening() {
     _subscription?.cancel();
     _subscription = null;
+  }
+
+  /// Compte le nombre de biens d'un utilisateur (nécessaire pour le paiement).
+  Future<int> countUserBiens(String userId) async {
+    return await _biensService.countUserBiens(userId);
   }
 
   /// Efface le message d'erreur.
@@ -57,22 +61,22 @@ class BiensNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Ajoute un nouveau bien. Retourne l'id du document créé.
+  /// Ajoute un nouveau bien.
   Future<String> addBien(BienImmobilier bien) async {
     return _biensService.addBien(bien);
   }
 
-  /// Met à jour un bien existant. Délègue au service.
+  /// Met à jour un bien existant.
   Future<void> updateBien(BienImmobilier bien) async {
     await _biensService.updateBien(bien);
   }
 
-  /// Supprime un bien par son id. Délègue au service.
+  /// Supprime un bien par son id.
   Future<void> deleteBien(String id) async {
     await _biensService.deleteBien(id);
   }
 
-  /// Ajoute ou retire un bien des favoris de l'utilisateur. Délègue au service.
+  /// Ajoute ou retire un bien des favoris.
   Future<void> toggleFavori({
     required String bienId,
     required String userId,
