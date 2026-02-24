@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import '../constants/app_constants.dart';
 import '../providers/auth_provider.dart';
 import 'login_screen.dart';
 
-/// Inscription : email, mot de passe, nom, téléphone, photo de profil, rôle.
-/// Après succès → déconnexion et retour à la page Connexion.
+/// Inscription simplifiée : email, mot de passe, nom, téléphone, photo de profil.
+/// Tout utilisateur est désormais considéré comme ayant les droits complets (propriétaire).
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -24,7 +23,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  UserRole _selectedRole = UserRole.client;
   File? _photoFile;
 
   void _showSnackBar(String message, {bool isError = false}) {
@@ -39,7 +37,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
-    final x = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, imageQuality: 85);
+    final x = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      imageQuality: 85,
+    );
     if (x != null && mounted) setState(() => _photoFile = File(x.path));
   }
 
@@ -48,25 +50,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final auth = context.read<AuthNotifier>();
     try {
+      // Appel de la méthode register simplifiée (le rôle est géré en interne dans AuthNotifier)
       await auth.register(
         _emailController.text.trim(),
         _passwordController.text.trim(),
-        _selectedRole,
-        displayName: _nomController.text.trim().isEmpty ? null : _nomController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        displayName: _nomController.text.trim().isEmpty
+            ? null
+            : _nomController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
         photoFile: _photoFile,
       );
       if (!mounted) return;
       await auth.logout();
       if (!mounted) return;
-      _showSnackBar('Compte créé. Connectez-vous pour accéder à l\'application.');
+      _showSnackBar(
+        'Compte créé. Connectez-vous pour accéder à l\'application.',
+      );
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
     } catch (_) {
       if (!mounted) return;
-      _showSnackBar(auth.errorMessage ?? 'Erreur lors de l\'inscription', isError: true);
+      _showSnackBar(
+        auth.errorMessage ?? 'Erreur lors de l\'inscription',
+        isError: true,
+      );
       auth.clearError();
     }
   }
@@ -116,9 +127,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: CircleAvatar(
                           radius: 48,
                           backgroundColor: theme.colorScheme.primaryContainer,
-                          backgroundImage: _photoFile != null ? FileImage(_photoFile!) : null,
+                          backgroundImage: _photoFile != null
+                              ? FileImage(_photoFile!)
+                              : null,
                           child: _photoFile == null
-                              ? Icon(Icons.add_a_photo, size: 40, color: theme.colorScheme.primary)
+                              ? Icon(
+                                  Icons.add_a_photo,
+                                  size: 40,
+                                  color: theme.colorScheme.primary,
+                                )
                               : null,
                         ),
                       ),
@@ -126,7 +143,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 8),
                     Text(
                       'Photo de profil (optionnel)',
-                      style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
@@ -136,7 +155,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Nom complet',
                         hintText: 'Votre nom',
                         prefixIcon: const Icon(Icons.person_outline),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
                       ),
                       textCapitalization: TextCapitalization.words,
@@ -148,12 +169,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Email *',
                         hintText: 'exemple@email.com',
                         prefixIcon: const Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
                       ),
                       keyboardType: TextInputType.emailAddress,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Veuillez saisir un email';
+                        if (v == null || v.trim().isEmpty)
+                          return 'Veuillez saisir un email';
                         if (!v.contains('@')) return 'Email invalide';
                         return null;
                       },
@@ -165,7 +189,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         labelText: 'Téléphone (WhatsApp)',
                         hintText: '+243 XXX XXX XXX',
                         prefixIcon: const Icon(Icons.phone_outlined),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
                       ),
                       keyboardType: TextInputType.phone,
@@ -176,12 +202,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: InputDecoration(
                         labelText: 'Mot de passe *',
                         prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
                       ),
                       obscureText: true,
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Veuillez saisir un mot de passe';
+                        if (v == null || v.isEmpty)
+                          return 'Veuillez saisir un mot de passe';
                         if (v.length < 6) return 'Au moins 6 caractères';
                         return null;
                       },
@@ -192,39 +221,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       decoration: InputDecoration(
                         labelText: 'Confirmer le mot de passe *',
                         prefixIcon: const Icon(Icons.lock_outline),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         filled: true,
                       ),
                       obscureText: true,
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Confirmez le mot de passe';
-                        if (v != _passwordController.text) return 'Les mots de passe diffèrent';
+                        if (v == null || v.isEmpty)
+                          return 'Confirmez le mot de passe';
+                        if (v != _passwordController.text)
+                          return 'Les mots de passe diffèrent';
                         return null;
                       },
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Je suis',
-                      style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 8),
-                    SegmentedButton<UserRole>(
-                      segments: const [
-                        ButtonSegment(value: UserRole.client, label: Text('Client'), icon: Icon(Icons.search)),
-                        ButtonSegment(value: UserRole.proprietaire, label: Text('Propriétaire'), icon: Icon(Icons.home_work)),
-                      ],
-                      selected: {_selectedRole},
-                      onSelectionChanged: (Set<UserRole> selected) => setState(() => _selectedRole = selected.first),
                     ),
                     const SizedBox(height: 28),
                     FilledButton(
                       onPressed: isLoading ? null : () => _register(context),
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: isLoading
-                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Text('Créer le compte'),
                     ),
                     const SizedBox(height: 16),

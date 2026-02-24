@@ -1,11 +1,7 @@
 /// Constantes de l'application Sabad — Vente & location immobilière à Kinshasa.
 
 /// Rôles utilisateur dans l'application.
-enum UserRole {
-  client,
-  proprietaire,
-  admin,
-}
+enum UserRole { client, proprietaire, admin }
 
 extension UserRoleExt on UserRole {
   String get label {
@@ -53,26 +49,29 @@ const List<Map<String, String>> kTypesOffre = [
 
 /// Les 24 communes de Kinshasa (RDC).
 const List<String> kCommunesKinshasa = [
+  'Bandalungwa',
   'Barumbu',
   'Bumbu',
   'Gombe',
   'Kalamu',
   'Kasa-Vubu',
   'Kimbanseke',
-  'Kinsenso',
+  'Kinshasa',
+  'Kintambo',
   'Kisenso',
   'Lemba',
   'Limete',
   'Lingwala',
   'Makala',
   'Maluku',
-  'Masina I',
+  'Masina',
   'Matete',
-  'Mont Ngafula',
+  'Mont-Ngafula',
   'Ndjili',
   'Ngaba',
   'Ngaliema',
   'Ngiri-Ngiri',
+  'Nsele',
   'Selembao',
 ];
 

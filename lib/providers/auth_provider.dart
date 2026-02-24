@@ -10,8 +10,7 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/users_service.dart';
 
-/// Gestionnaire d'état d'authentification (ChangeNotifier) : utilisateur courant,
-/// profil (rôle), login/logout, erreurs. Les écrans utilisent ce notifier via Provider.
+/// Gestionnaire d'état d'authentification : tout utilisateur a accès à toutes les fonctionnalités.
 class AuthNotifier extends ChangeNotifier {
   final AuthService _authService = AuthService.instance;
   final UsersService _usersService = UsersService.instance;
@@ -24,17 +23,14 @@ class AuthNotifier extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  /// Utilisateur Firebase actuellement connecté (null si déconnecté).
   User? get currentUser => _authService.currentUser;
-
-  /// Profil Firestore (rôle, etc.). Null si non chargé ou déconnecté.
   UserApp? get currentUserProfile => _currentUserProfile;
 
-  /// Rôle courant (client, proprietaire, admin).
-  UserRole get role => UserRoleExt.fromString(_currentUserProfile?.role);
+  /// Désormais, tout utilisateur authentifié est considéré comme ayant les droits complets (propriétaire).
+  UserRole get role => UserRole.proprietaire;
 
-  bool get isProprietaire => role == UserRole.proprietaire;
-  bool get isAdmin => role == UserRole.admin;
+  bool get isProprietaire => true;
+  bool get isAdmin => _currentUserProfile?.role == 'admin';
 
   AuthNotifier() {
     _authService.authStateChanges.listen((user) async {
@@ -46,7 +42,7 @@ class AuthNotifier extends ChangeNotifier {
             uid: user.uid,
             email: user.email ?? '',
             dateInscription: DateTime.now(),
-            role: 'client',
+            role: 'proprietaire', // Rôle unique pour tous
             displayName: user.displayName,
             photoUrl: user.photoURL,
           );
@@ -67,26 +63,13 @@ class AuthNotifier extends ChangeNotifier {
     });
   }
 
-  void _setLoading(bool value) {
-    _isLoading = value;
-    notifyListeners();
-  }
+  void _setLoading(bool value) => _isLoading = value;
+  void _setError(String? message) => _errorMessage = message;
+  void clearError() => _setError(null);
 
-  void _setError(String? message) {
-    _errorMessage = message;
-    notifyListeners();
-  }
-
-  /// Efface le message d'erreur affiché (ex. après affichage en SnackBar).
-  void clearError() {
-    _setError(null);
-  }
-
-  /// Inscription avec email, mot de passe, rôle, nom, téléphone et optionnellement photo.
   Future<void> register(
     String email,
-    String password,
-    UserRole role, {
+    String password, {
     String? displayName,
     String? phone,
     File? photoFile,
@@ -102,13 +85,16 @@ class AuthNotifier extends ChangeNotifier {
       if (user != null) {
         String? photoUrl = user.photoURL;
         if (photoFile != null) {
-          photoUrl = await StorageService.instance.uploadProfilePhoto(user.uid, photoFile);
+          photoUrl = await StorageService.instance.uploadProfilePhoto(
+            user.uid,
+            photoFile,
+          );
         }
         final profile = UserApp(
           uid: user.uid,
           email: user.email ?? email,
           dateInscription: DateTime.now(),
-          role: role.value,
+          role: 'proprietaire', // Tout le monde est propriétaire par défaut
           displayName: displayName ?? user.displayName,
           phone: phone,
           photoUrl: photoUrl,
@@ -120,10 +106,10 @@ class AuthNotifier extends ChangeNotifier {
       rethrow;
     } finally {
       _setLoading(false);
+      notifyListeners();
     }
   }
 
-  /// Connexion avec email et mot de passe. Délègue au service.
   Future<void> login(String email, String password) async {
     _setLoading(true);
     _setError(null);
@@ -137,24 +123,15 @@ class AuthNotifier extends ChangeNotifier {
       rethrow;
     } finally {
       _setLoading(false);
+      notifyListeners();
     }
   }
 
-  /// Déconnexion. Délègue au service.
   Future<void> logout() async {
-    _setLoading(true);
-    _setError(null);
-    try {
-      await _authService.logout();
-    } catch (e) {
-      _setError(_messageFromException(e));
-      rethrow;
-    } finally {
-      _setLoading(false);
-    }
+    await _authService.logout();
+    notifyListeners();
   }
 
-  /// Connexion via le provider externe Google. Délègue au service.
   Future<void> loginWithGoogle() async {
     _setLoading(true);
     _setError(null);
@@ -165,14 +142,13 @@ class AuthNotifier extends ChangeNotifier {
       rethrow;
     } finally {
       _setLoading(false);
+      notifyListeners();
     }
   }
 
-  /// Extrait un message lisible depuis une exception (ex. FirebaseAuthException).
   static String _messageFromException(Object e) {
-    if (e is FirebaseAuthException) {
+    if (e is FirebaseAuthException)
       return e.message ?? 'Erreur d\'authentification';
-    }
     return e.toString();
   }
 }
