@@ -30,6 +30,14 @@ class BiensService {
     await _collection.doc(id).delete();
   }
 
+  /// Compte le nombre de biens postés par un utilisateur.
+  Future<int> countUserBiens(String userId) async {
+    final query = await _collection
+        .where('proprietaireId', isEqualTo: userId)
+        .get();
+    return query.docs.length;
+  }
+
   /// Écoute en temps réel la liste des biens.
   /// Retourne un flux de listes de [BienImmobilier].
   Stream<List<BienImmobilier>> listenBiens() {
@@ -44,8 +52,6 @@ class BiensService {
   }
 
   /// Ajoute ou retire un favori pour un utilisateur donné sur un bien donné.
-  /// - [ajouter] = true → ajoute l'uid dans `favorisUserIds`
-  /// - [ajouter] = false → le retire.
   Future<void> toggleFavori({
     required String bienId,
     required String userId,
@@ -58,7 +64,8 @@ class BiensService {
       if (!snapshot.exists) return;
 
       final data = snapshot.data() ?? <String, dynamic>{};
-      final List<dynamic> favoris = (data['favorisUserIds'] as List<dynamic>? ?? []);
+      final List<dynamic> favoris =
+          (data['favorisUserIds'] as List<dynamic>? ?? []);
 
       if (ajouter) {
         if (!favoris.contains(userId)) {
@@ -72,4 +79,3 @@ class BiensService {
     });
   }
 }
-
