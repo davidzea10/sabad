@@ -16,10 +16,12 @@ class BienImmobilier {
   final DateTime dateCreation;
   final DateTime? dateModification;
   final List<String> favorisUserIds;
+  final String identityDocUrl;
+  final String? parcelDocUrl;
 
-  /// Nouveaux champs pour la garantie (URLs vers Storage)
-  final String identityDocUrl; // Obligatoire
-  final String? parcelDocUrl; // Obligatoire si à vendre
+  /// Coordonnées GPS pour la localisation
+  final double? latitude;
+  final double? longitude;
 
   const BienImmobilier({
     required this.id,
@@ -38,6 +40,8 @@ class BienImmobilier {
     this.videoUrl,
     this.dateModification,
     this.favorisUserIds = const [],
+    this.latitude,
+    this.longitude,
   });
 
   factory BienImmobilier.fromDocument(
@@ -66,6 +70,8 @@ class BienImmobilier {
           .toList(),
       identityDocUrl: data['identityDocUrl'] as String? ?? '',
       parcelDocUrl: data['parcelDocUrl'] as String?,
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
     );
   }
 
@@ -87,6 +93,8 @@ class BienImmobilier {
       'favorisUserIds': favorisUserIds,
       'identityDocUrl': identityDocUrl,
       if (parcelDocUrl != null) 'parcelDocUrl': parcelDocUrl,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
     };
   }
 
@@ -107,6 +115,8 @@ class BienImmobilier {
     List<String>? favorisUserIds,
     String? identityDocUrl,
     String? parcelDocUrl,
+    double? latitude,
+    double? longitude,
   }) {
     return BienImmobilier(
       id: id ?? this.id,
@@ -125,6 +135,8 @@ class BienImmobilier {
       favorisUserIds: favorisUserIds ?? this.favorisUserIds,
       identityDocUrl: identityDocUrl ?? this.identityDocUrl,
       parcelDocUrl: parcelDocUrl ?? this.parcelDocUrl,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
     );
   }
 }

@@ -10,7 +10,7 @@ import '../services/auth_service.dart';
 import '../services/storage_service.dart';
 import '../services/users_service.dart';
 
-/// Gestionnaire d'état d'authentification : tout utilisateur a accès à toutes les fonctionnalités.
+/// Gestionnaire d'état d'authentification.
 class AuthNotifier extends ChangeNotifier {
   final AuthService _authService = AuthService.instance;
   final UsersService _usersService = UsersService.instance;
@@ -22,15 +22,15 @@ class AuthNotifier extends ChangeNotifier {
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-
   User? get currentUser => _authService.currentUser;
   UserApp? get currentUserProfile => _currentUserProfile;
 
-  /// Désormais, tout utilisateur authentifié est considéré comme ayant les droits complets (propriétaire).
-  UserRole get role => UserRole.proprietaire;
+  /// Retourne le rôle réel depuis le profil Firestore.
+  UserRole get role => UserRoleExt.fromString(_currentUserProfile?.role);
 
-  bool get isProprietaire => true;
-  bool get isAdmin => _currentUserProfile?.role == 'admin';
+  /// Un utilisateur est considéré propriétaire s'il a le rôle ou s'il est admin.
+  bool get isProprietaire => role == UserRole.proprietaire || role == UserRole.admin;
+  bool get isAdmin => role == UserRole.admin;
 
   AuthNotifier() {
     _authService.authStateChanges.listen((user) async {
@@ -42,7 +42,7 @@ class AuthNotifier extends ChangeNotifier {
             uid: user.uid,
             email: user.email ?? '',
             dateInscription: DateTime.now(),
-            role: 'proprietaire', // Rôle unique pour tous
+            role: 'client', // Tout le monde commence comme client
             displayName: user.displayName,
             photoUrl: user.photoURL,
           );
@@ -63,38 +63,41 @@ class AuthNotifier extends ChangeNotifier {
     });
   }
 
+  /// Permet de promouvoir un client en propriétaire.
+  Future<void> promoteToProprietaire() async {
+    if (_currentUserProfile == null || role == UserRole.proprietaire) return;
+    final updatedProfile = UserApp(
+      uid: _currentUserProfile!.uid,
+      email: _currentUserProfile!.email,
+      dateInscription: _currentUserProfile!.dateInscription,
+      role: 'proprietaire',
+      displayName: _currentUserProfile!.displayName,
+      phone: _currentUserProfile!.phone,
+      photoUrl: _currentUserProfile!.photoUrl,
+    );
+    await _usersService.createOrUpdateUser(updatedProfile);
+  }
+
   void _setLoading(bool value) => _isLoading = value;
   void _setError(String? message) => _errorMessage = message;
   void clearError() => _setError(null);
 
-  Future<void> register(
-    String email,
-    String password, {
-    String? displayName,
-    String? phone,
-    File? photoFile,
-  }) async {
+  Future<void> register(String email, String password, {String? displayName, String? phone, File? photoFile}) async {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.registerWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      await _authService.registerWithEmailAndPassword(email: email, password: password);
       final user = _authService.currentUser;
       if (user != null) {
         String? photoUrl = user.photoURL;
         if (photoFile != null) {
-          photoUrl = await StorageService.instance.uploadProfilePhoto(
-            user.uid,
-            photoFile,
-          );
+          photoUrl = await StorageService.instance.uploadProfilePhoto(user.uid, photoFile);
         }
         final profile = UserApp(
           uid: user.uid,
           email: user.email ?? email,
           dateInscription: DateTime.now(),
-          role: 'proprietaire', // Tout le monde est propriétaire par défaut
+          role: 'client', // Défaut à l'inscription
           displayName: displayName ?? user.displayName,
           phone: phone,
           photoUrl: photoUrl,
@@ -102,7 +105,7 @@ class AuthNotifier extends ChangeNotifier {
         await _usersService.createOrUpdateUser(profile);
       }
     } catch (e) {
-      _setError(_messageFromException(e));
+      _setError(e.toString());
       rethrow;
     } finally {
       _setLoading(false);
@@ -114,12 +117,9 @@ class AuthNotifier extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.loginWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      await _authService.loginWithEmailAndPassword(email: email, password: password);
     } catch (e) {
-      _setError(_messageFromException(e));
+      _setError(e.toString());
       rethrow;
     } finally {
       _setLoading(false);
@@ -138,17 +138,11 @@ class AuthNotifier extends ChangeNotifier {
     try {
       await _authService.signInWithGoogle();
     } catch (e) {
-      _setError(_messageFromException(e));
+      _setError(e.toString());
       rethrow;
     } finally {
       _setLoading(false);
       notifyListeners();
     }
-  }
-
-  static String _messageFromException(Object e) {
-    if (e is FirebaseAuthException)
-      return e.message ?? 'Erreur d\'authentification';
-    return e.toString();
   }
 }

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'accueil_tab_screen.dart';
+import 'autres_tab_screen.dart';
 import 'discussion_tab_screen.dart';
 import 'maisons_tab_screen.dart';
-import 'autres_tab_screen.dart';
 import 'profil_tab_screen.dart';
 
-/// Coque principale après connexion : barre de navigation en bas avec 5 onglets.
+/// Coque principale avec 5 onglets.
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key});
 

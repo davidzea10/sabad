@@ -8,7 +8,7 @@ import '../providers/biens_provider.dart';
 import 'detail_bien_screen.dart';
 import 'form_bien_screen.dart';
 
-/// Onglet Maisons : liste des biens avec filtres (commune, louer/vendre), prix en $.
+/// Onglet Maisons : liste des biens avec filtres.
 class MaisonsTabScreen extends StatefulWidget {
   const MaisonsTabScreen({super.key});
 
@@ -34,7 +34,11 @@ class _MaisonsTabScreenState extends State<MaisonsTabScreen> {
     super.dispose();
   }
 
-  List<BienImmobilier> _filterBiens(List<BienImmobilier> biens, String? uid, bool isProprietaire) {
+  List<BienImmobilier> _filterBiens(
+    List<BienImmobilier> biens,
+    String? uid,
+    bool isProprietaire,
+  ) {
     var out = biens;
     if (_filterCommune != null && _filterCommune!.isNotEmpty) {
       out = out.where((b) => b.commune == _filterCommune).toList();
@@ -57,18 +61,14 @@ class _MaisonsTabScreenState extends State<MaisonsTabScreen> {
     final uid = auth.currentUser?.uid;
 
     if (profile == null && auth.currentUser != null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final biens = _filterBiens(biensNotifier.biens, uid, isProprietaire);
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Les maisons'),
-      ),
+      appBar: AppBar(title: const Text('Les maisons')),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -94,16 +94,31 @@ class _MaisonsTabScreenState extends State<MaisonsTabScreen> {
                           value: _filterCommune ?? '',
                           decoration: InputDecoration(
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             filled: true,
                           ),
-                          hint: const Text('Commune'),
                           items: [
-                            const DropdownMenuItem(value: '', child: Text('Toutes')),
-                            ...kCommunesKinshasa.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis))),
+                            const DropdownMenuItem(
+                              value: '',
+                              child: Text('Toutes'),
+                            ),
+                            ...kCommunesKinshasa.map(
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(c, overflow: TextOverflow.ellipsis),
+                              ),
+                            ),
                           ],
-                          onChanged: (v) => setState(() => _filterCommune = v?.isEmpty == true ? null : v),
+                          onChanged: (v) => setState(
+                            () =>
+                                _filterCommune = v?.isEmpty == true ? null : v,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -112,17 +127,31 @@ class _MaisonsTabScreenState extends State<MaisonsTabScreen> {
                           value: _filterTypeOffre ?? '',
                           decoration: InputDecoration(
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             filled: true,
                           ),
-                          hint: const Text('Offre'),
                           items: const [
                             DropdownMenuItem(value: '', child: Text('Toutes')),
-                            DropdownMenuItem(value: kTypeLouer, child: Text('À louer')),
-                            DropdownMenuItem(value: kTypeVendre, child: Text('À vendre')),
+                            DropdownMenuItem(
+                              value: kTypeLouer,
+                              child: Text('À louer'),
+                            ),
+                            DropdownMenuItem(
+                              value: kTypeVendre,
+                              child: Text('À vendre'),
+                            ),
                           ],
-                          onChanged: (v) => setState(() => _filterTypeOffre = v?.isEmpty == true ? null : v),
+                          onChanged: (v) => setState(
+                            () => _filterTypeOffre = v?.isEmpty == true
+                                ? null
+                                : v,
+                          ),
                         ),
                       ),
                     ],
@@ -140,130 +169,108 @@ class _MaisonsTabScreenState extends State<MaisonsTabScreen> {
             ),
           ),
           Expanded(
-            child: _buildList(context, biens, biensNotifier.isLoading, biensNotifier.errorMessage),
+            child: _buildList(
+              context,
+              biens,
+              biensNotifier.isLoading,
+              biensNotifier.errorMessage,
+            ),
           ),
         ],
       ),
-      floatingActionButton: isProprietaire
+      // Le bouton est désormais visible pour tout utilisateur connecté
+      floatingActionButton: auth.currentUser != null
           ? FloatingActionButton.extended(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => FormBienScreen(bien: null)),
-                );
-              },
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const FormBienScreen(bien: null),
+                ),
+              ),
               icon: const Icon(Icons.add),
-              label: const Text('Ajouter un bien'),
+              label: const Text('Ajouter un bien immobilier'),
             )
           : null,
     );
   }
 
-  Widget _buildList(BuildContext context, List<BienImmobilier> biens, bool isLoading, String? errorMessage) {
+  Widget _buildList(
+    BuildContext context,
+    List<BienImmobilier> biens,
+    bool isLoading,
+    String? errorMessage,
+  ) {
     if (errorMessage != null && errorMessage.isNotEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(errorMessage, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => context.read<BiensNotifier>().clearError(),
-                child: const Text('Réessayer'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    if (isLoading && biens.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (biens.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.home_work_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 16),
-            Text(
-              'Aucun bien ne correspond à vos filtres.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
+            Text(errorMessage),
+            ElevatedButton(
+              onPressed: () {
+                context.read<BiensNotifier>().clearError();
+                context.read<BiensNotifier>().startListening();
+              },
+              child: const Text('Réessayer'),
             ),
           ],
         ),
       );
     }
+    if (isLoading && biens.isEmpty)
+      return const Center(child: CircularProgressIndicator());
+    if (biens.isEmpty) return const Center(child: Text('Aucun bien trouvé.'));
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(16),
       itemCount: biens.length,
-      itemBuilder: (context, index) {
-        final bien = biens[index];
-        return _BienCard(bien: bien);
-      },
+      itemBuilder: (context, index) => _BienCard(bien: biens[index]),
     );
   }
 }
 
 class _BienCard extends StatelessWidget {
   const _BienCard({required this.bien});
-
   final BienImmobilier bien;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isLouer = bien.typeOffre == kTypeLouer;
-    final firstImage = bien.images.isNotEmpty ? bien.images.first : null;
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => DetailBienScreen(bien: bien)),
-          );
-        },
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => DetailBienScreen(bien: bien))),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: firstImage != null && firstImage.startsWith('http')
-                  ? Image.network(firstImage, fit: BoxFit.cover)
-                  : Container(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Icon(Icons.home_rounded, size: 48, color: theme.colorScheme.primary),
-                    ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bien.titre,
-                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${bien.commune.isNotEmpty ? bien.commune : "Kinshasa"} • ${isLouer ? "À louer" : "À vendre"}',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${bien.prix.toStringAsFixed(0)} \$',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+            if (bien.images.isNotEmpty)
+              Image.network(
+                bien.images.first,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  height: 180,
+                  color: Colors.grey.shade200,
+                  child: const Icon(Icons.broken_image, size: 64),
+                ),
+              )
+            else
+              Container(
+                height: 180,
+                color: Colors.grey.shade200,
+                child: const Icon(Icons.home, size: 64),
+              ),
+            ListTile(
+              title: Text(
+                bien.titre,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '${bien.commune} • ${bien.prix.toStringAsFixed(0)} \$',
+              ),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.primary,
               ),
             ),
           ],

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -12,7 +13,7 @@ import '../services/payment_service.dart';
 import '../services/storage_service.dart';
 import 'main_shell_screen.dart';
 
-/// Formulaire complet d'ajout/modification avec photos, vidéo et garanties.
+/// Formulaire complet d'ajout/modification avec photos, vidéo, garanties et localisation.
 class FormBienScreen extends StatefulWidget {
   const FormBienScreen({super.key, this.bien});
   final BienImmobilier? bien;
@@ -46,6 +47,10 @@ class _FormBienScreenState extends State<FormBienScreen> {
   String? _existingIdentityUrl;
   String? _existingParcelUrl;
 
+  // Localisation
+  double? _latitude;
+  double? _longitude;
+
   bool _isSaving = false;
 
   @override
@@ -68,6 +73,8 @@ class _FormBienScreenState extends State<FormBienScreen> {
       _existingVideoUrl = b.videoUrl;
       _existingIdentityUrl = b.identityDocUrl;
       _existingParcelUrl = b.parcelDocUrl;
+      _latitude = b.latitude;
+      _longitude = b.longitude;
     }
   }
 
@@ -102,6 +109,44 @@ class _FormBienScreenState extends State<FormBienScreen> {
         else
           _parcelFile = File(x.path);
       });
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _showError('Veuillez activer la localisation sur votre téléphone.');
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showError('Permission de localisation refusée.');
+        return;
+      }
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      _showError('Les permissions de localisation sont définitivement refusées.');
+      return;
+    } 
+
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Position capturée avec succès !'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      _showError('Impossible de récupérer la position : $e');
     }
   }
 
@@ -187,12 +232,17 @@ class _FormBienScreenState extends State<FormBienScreen> {
         identityDocUrl: identityUrl,
         parcelDocUrl: parcelUrl,
         adresse: _adresseController.text.trim(),
+        latitude: _latitude,
+        longitude: _longitude,
       );
 
-      if (widget.bien == null)
+      // Promotion de l'utilisateur s'il publie son premier bien
+      if (widget.bien == null) {
+        await auth.promoteToProprietaire();
         await biensNotifier.addBien(bien);
-      else
+      } else {
         await biensNotifier.updateBien(bien);
+      }
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
@@ -262,6 +312,23 @@ class _FormBienScreenState extends State<FormBienScreen> {
                   DropdownMenuItem(value: kTypeVendre, child: Text('À vendre')),
                 ],
                 onChanged: (v) => setState(() => _selectedTypeOffre = v!),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _adresseController,
+                decoration: const InputDecoration(
+                  labelText: 'Adresse exacte (Optionnel)',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _getCurrentLocation,
+                icon: Icon(_latitude != null ? Icons.location_on : Icons.my_location),
+                label: Text(_latitude != null ? 'Position capturée' : 'Ma position GPS actuelle'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _latitude != null ? Colors.green : theme.colorScheme.primary,
+                ),
               ),
 
               const SizedBox(height: 24),

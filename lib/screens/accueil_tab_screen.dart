@@ -19,16 +19,19 @@ class AccueilTabScreen extends StatelessWidget {
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(
-            child: _SectionHero(theme: theme, userName: auth.currentUserProfile?.displayName),
+            child: _SectionHero(
+              theme: theme,
+              userName: auth.currentUserProfile?.displayName,
+            ),
           ),
+          SliverToBoxAdapter(child: _SectionCommentCaMarche(theme: theme)),
+          SliverToBoxAdapter(child: _SectionServices(theme: theme)),
           SliverToBoxAdapter(
-            child: _SectionCommentCaMarche(theme: theme),
-          ),
-          SliverToBoxAdapter(
-            child: _SectionServices(theme: theme),
-          ),
-          SliverToBoxAdapter(
-            child: _SectionCTA(context: context, theme: theme, onVoirAnnonces: onVoirAnnonces),
+            child: _SectionCTA(
+              context: context,
+              theme: theme,
+              onVoirAnnonces: onVoirAnnonces,
+            ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
@@ -65,7 +68,11 @@ class _SectionHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.home_work_rounded, size: 48, color: theme.colorScheme.primary),
+          Icon(
+            Icons.home_work_rounded,
+            size: 48,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(height: 16),
           Text(
             'Sabad',
@@ -84,7 +91,7 @@ class _SectionHero extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Trouvez ou proposez des maisons, appartements et parcelles dans les 21 communes.',
+            'Trouvez ou proposez des maisons, appartements et parcelles dans les 24 communes.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onPrimaryContainer.withOpacity(0.9),
             ),
@@ -109,7 +116,9 @@ class _SectionCommentCaMarche extends StatelessWidget {
         children: [
           Text(
             'Comment ça marche',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 16),
           _StepTile(
@@ -125,7 +134,8 @@ class _SectionCommentCaMarche extends StatelessWidget {
           _StepTile(
             icon: Icons.chat_bubble_outline,
             title: 'Contacter',
-            subtitle: 'Discutez avec le propriétaire ou contactez-le par WhatsApp.',
+            subtitle:
+                'Discutez avec le propriétaire ou contactez-le par WhatsApp.',
           ),
         ],
       ),
@@ -162,9 +172,19 @@ class _StepTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ],
             ),
           ),
@@ -188,7 +208,9 @@ class _SectionServices extends StatelessWidget {
         children: [
           Text(
             'Nos services',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -199,9 +221,17 @@ class _SectionServices extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        Icon(Icons.home_rounded, size: 40, color: theme.colorScheme.primary),
+                        Icon(
+                          Icons.home_rounded,
+                          size: 40,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(height: 8),
-                        Text('Maisons', style: theme.textTheme.titleSmall, textAlign: TextAlign.center),
+                        Text(
+                          'Maisons',
+                          style: theme.textTheme.titleSmall,
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),
@@ -214,9 +244,17 @@ class _SectionServices extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        Icon(Icons.apartment, size: 40, color: theme.colorScheme.primary),
+                        Icon(
+                          Icons.apartment,
+                          size: 40,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(height: 8),
-                        Text('Appartements', style: theme.textTheme.titleSmall, textAlign: TextAlign.center),
+                        Text(
+                          'Appartements',
+                          style: theme.textTheme.titleSmall,
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),
@@ -230,9 +268,15 @@ class _SectionServices extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Icon(Icons.landscape, size: 40, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.landscape,
+                    size: 40,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: Text('Parcelles', style: theme.textTheme.titleSmall)),
+                  Expanded(
+                    child: Text('Parcelles', style: theme.textTheme.titleSmall),
+                  ),
                 ],
               ),
             ),
@@ -244,7 +288,11 @@ class _SectionServices extends StatelessWidget {
 }
 
 class _SectionCTA extends StatelessWidget {
-  const _SectionCTA({required this.context, required this.theme, this.onVoirAnnonces});
+  const _SectionCTA({
+    required this.context,
+    required this.theme,
+    this.onVoirAnnonces,
+  });
 
   final BuildContext context;
   final ThemeData theme;
@@ -259,14 +307,18 @@ class _SectionCTA extends StatelessWidget {
         children: [
           Text(
             'Découvrir les biens',
-            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: onVoirAnnonces,
             icon: const Icon(Icons.list),
             label: const Text('Voir toutes les annonces'),
-            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+            ),
           ),
         ],
       ),
